@@ -1,13 +1,13 @@
 package mib_parser
 
 import (
-	coreparser "github.com/Olian04/go-mib-parser/parser"
+	"github.com/Olian04/go-mib-parser/parser"
 )
 
 // ParseMIB is the public API entrypoint.
 // It parses a MIB module and returns a Module with resolved OIDs and objects.
 func ParseMIB(mib []byte) (*Module, error) {
-	ir, err := coreparser.Parse(mib)
+	ir, err := parser.Parse(mib)
 	if err != nil {
 		return nil, err
 	}

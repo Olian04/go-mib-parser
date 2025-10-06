@@ -1,6 +1,7 @@
-package parser
+package tests
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -9,7 +10,8 @@ import (
 )
 
 func TestAllMibsParse(t *testing.T) {
-	entries, err := mib_parser.MIBs.ReadDir("mibs")
+
+	entries, err := os.ReadDir(filepath.Join("..", "mibs"))
 	if err != nil {
 		t.Fatalf("Failed to list mibs directory: %v", err)
 	}
@@ -24,7 +26,7 @@ func TestAllMibsParse(t *testing.T) {
 			continue
 		}
 		t.Run(name, func(t *testing.T) {
-			mib, err := mib_parser.MIBs.ReadFile(filepath.Join("mibs", name))
+			mib, err := os.ReadFile(filepath.Join("..", "mibs", name))
 			if err != nil {
 				t.Fatalf("Failed to read %s: %v", name, err)
 			}

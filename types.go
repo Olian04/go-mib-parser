@@ -1,5 +1,10 @@
 package mib_parser
 
+import (
+	"fmt"
+	"strings"
+)
+
 // Module represents a parsed MIB module.
 // It contains declared OID nodes and OBJECT-TYPE definitions resolved to full OIDs.
 type Module struct {
@@ -46,46 +51,11 @@ func (m *Module) GetNodeOIDByName(name string) ([]int, bool) {
 	return append([]int(nil), n.OID...), true
 }
 
-// OIDString converts an OID slice to dotted string form.
-func OIDString(oid []int) string {
-	if len(oid) == 0 {
-		return ""
+// String converts an OidNode to dotted string form.
+func (oid OidNode) String() string {
+	strs := []string{}
+	for _, n := range oid.OID {
+		strs = append(strs, fmt.Sprintf("%d", n))
 	}
-	// Manual conversion to avoid importing fmt for hot path
-	// But clarity is preferred; use fmt for now.
-	// The library is not performance critical at this stage.
-	s := ""
-	for i, n := range oid {
-		if i > 0 {
-			s += "."
-		}
-		// safe to use fmt here for correctness and readability
-		s += itoa(n)
-	}
-	return s
-}
-
-// itoa is a tiny integer to ascii converter to avoid fmt.Sprintf in tight loops.
-// For simplicity and readability, keep it straightforward.
-func itoa(n int) string {
-	if n == 0 {
-		return "0"
-	}
-	neg := false
-	if n < 0 {
-		neg = true
-		n = -n
-	}
-	buf := [20]byte{}
-	i := len(buf)
-	for n > 0 {
-		i--
-		buf[i] = byte('0' + (n % 10))
-		n /= 10
-	}
-	if neg {
-		i--
-		buf[i] = '-'
-	}
-	return string(buf[i:])
+	return strings.Join(strs, ".")
 }

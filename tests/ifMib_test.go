@@ -1,14 +1,16 @@
-package parser
+package tests
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"testing"
 
 	mib_parser "github.com/Olian04/go-mib-parser"
 )
 
 func TestIfMib(t *testing.T) {
-	mib, err := mib_parser.MIBs.ReadFile("mibs/IF-MIB.MIB")
+	mib, err := os.ReadFile(filepath.Join("..", "mibs", "IF-MIB.MIB"))
 	if err != nil {
 		t.Fatalf("Failed to read IF-MIB: %v", err)
 	}
