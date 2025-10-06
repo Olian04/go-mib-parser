@@ -1,0 +1,142 @@
+---
+description: Development workflow
+alwaysApply: true
+---
+
+# Development Workflow Guidelines
+
+This document outlines the recommended development workflows, processes, and best practices for the project. Following these guidelines ensures consistency, quality, and efficiency across the development lifecycle.
+
+## Workflow
+
+1. **Understand Requirements**
+   - Review the task description thoroughly
+   - Identify acceptance criteria and expected outcomes
+   - Clarify any ambiguities before starting, by asking the USER for input
+   - IF you are UNSURE, ALWAYS ask the USER for clarifications.
+
+2. **Check Related Guidelines**
+   - Before starting work on any task, check for relevant guidance in the `.cursor/rules` directory
+   - Look for files matching your task type (e.g., `components.md` for component development)
+   - These documents contain established workflows, conventions, and requirements specific to each task type
+
+3. **Analyze Dependencies**
+   - Identify any dependencies on other tasks or components
+   - Ensure prerequisite tasks are completed before starting
+   - Consider the impact of your changes on dependent components
+
+4. **Plan Implementation**
+   - Break down complex tasks into smaller, manageable steps
+   - Identify the files and components that need to be modified
+   - Create a mental model of the implementation approach
+   - ALWAYS ask user to review the implementation plan and APPROVE it before making changes
+
+5. **Final Updates**
+   - Update README.md with any new features or changes
+   - Update CHANGELOG.md with notable changes
+   - Update any other relevant documentation
+
+## Feature Development Workflow
+
+### Planning Phase
+
+1. **Requirements Gathering**
+   - Collect and document requirements
+   - Identify stakeholders and their needs
+   - Define acceptance criteria
+
+2. **Design Phase**
+   - Create a high-level design
+   - Define component architecture
+   - Identify potential challenges and solutions
+
+3. **Task Breakdown**
+   - Break down the feature into manageable tasks
+   - Prioritize tasks based on dependencies
+   - IF needed, create a "[FEATURE_NAME]-tasks.md" file to keep track of the implementation steps/tasks, particular for larger refactors or new features.
+
+### Development Phase
+
+1. **Implementation**
+   - Implement features incrementally
+   - Maintain regular communication with the USER
+   - IF anything unexpected happens that forced changes to the planned implementation, ALWAYS promt the user for feedback and APPROVAL
+
+2. **Integration**
+   - Integrate components and features
+   - Resolve integration issues
+   - Ensure consistent behavior across the application
+
+3. **Testing**
+   - Perform unit testing (if applicable)
+   - Conduct integration testing (if applicable)
+   - Execute end-to-end testing (if applicable)
+
+## Code Review Guidelines
+
+1. **Code Quality**
+   - Check for adherence to coding standards
+   - Verify proper error handling
+   - Ensure appropriate test coverage
+
+2. **Functionality**
+   - Verify that the code meets requirements
+   - Check for edge cases and error conditions
+   - Ensure the code is efficient and performant
+
+3. **Maintainability**
+   - Evaluate code readability and clarity
+   - Check for proper documentation
+   - Ensure the code follows established patterns
+
+## Documentation Guidelines
+
+### Code Documentation
+
+1. **Inline Comments**
+   - Explain complex logic
+   - Document non-obvious decisions
+   - Provide context for future developers
+
+2. **JSDoc Comments**
+   - Document public APIs
+   - Include parameter and return types
+   - Provide usage examples
+
+3. **README Files**
+   - Include setup instructions
+   - Document available scripts
+   - Provide usage examples
+
+## Best Practices
+
+1. **Version Control**
+   - Use descriptive commit messages
+   - Follow conventional commits format
+   - Keep commits focused and atomic
+
+2. **Error Handling**
+   - Handle errors gracefully
+   - Provide meaningful error messages
+   - Log errors appropriately
+
+3. **Performance**
+   - Optimize critical paths
+   - Minimize unnecessary re-renders
+   - Use appropriate data structures and algorithms
+
+4. **Accessibility**
+   - Follow WCAG guidelines
+   - Test with screen readers
+   - Ensure keyboard navigation works
+
+5. **Security**
+   - Validate user input
+   - Protect against common vulnerabilities
+   - Follow security best practices
+
+## Continuous Improvement
+
+- If you've learned new concepts, workflows, or best practices during task completion, suggest updates to the relevant rules or create memories for them
+- For new workflows that aren't covered by existing rules, suggest creating a new rule file
+- Regularly review and update documentation to reflect current practices
