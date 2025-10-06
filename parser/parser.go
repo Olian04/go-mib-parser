@@ -9,9 +9,13 @@ import (
 // ModuleIR is an internal representation of a parsed MIB module.
 // It is designed to avoid import cycles with the public package.
 type ModuleIR struct {
-	Name          string
-	NodesByName   map[string][]int
-	ObjectsByName map[string]*ObjectTypeIR
+	Name               string
+	NodesByName        map[string][]int
+	ObjectsByName      map[string]*ObjectTypeIR
+	ModuleIdentity     *ModuleIdentityIR
+	ObjectIdentities   map[string]*ObjectIdentityIR
+	TextualConventions map[string]*TextualConventionIR
+	NotificationTypes  map[string]*NotificationTypeIR
 }
 
 // ObjectTypeIR is an internal representation of OBJECT-TYPE definitions.
@@ -25,14 +29,53 @@ type ObjectTypeIR struct {
 	Index       []string
 }
 
+type ModuleIdentityIR struct {
+	Name         string
+	OID          []int
+	LastUpdated  string
+	Organization string
+	ContactInfo  string
+	Description  string
+}
+
+type ObjectIdentityIR struct {
+	Name        string
+	OID         []int
+	Status      string
+	Description string
+}
+
+type TextualConventionIR struct {
+	Name        string
+	DisplayHint string
+	Status      string
+	Description string
+	Syntax      string
+}
+
+type NotificationTypeIR struct {
+	Name        string
+	OID         []int
+	Objects     []string
+	Status      string
+	Description string
+}
+
 type rdParser struct {
-	l   *lexer.Lexer
-	tok lexer.Token
-	mod *ModuleIR
+	l    *lexer.Lexer
+	tok  lexer.Token
+	mod  *ModuleIR
+	pend []pendingRef
+}
+
+type pendingRef struct {
+	parent string
+	index  int
+	apply  func(base []int)
 }
 
 func Parse(input []byte) (*ModuleIR, error) {
-	p := &rdParser{l: lexer.New(input), mod: &ModuleIR{NodesByName: map[string][]int{}, ObjectsByName: map[string]*ObjectTypeIR{}}}
+	p := &rdParser{l: lexer.New(input), mod: &ModuleIR{NodesByName: map[string][]int{}, ObjectsByName: map[string]*ObjectTypeIR{}, ObjectIdentities: map[string]*ObjectIdentityIR{}, TextualConventions: map[string]*TextualConventionIR{}, NotificationTypes: map[string]*NotificationTypeIR{}}}
 	p.next()
 	p.initBaseOids()
 
@@ -90,13 +133,21 @@ func (p *rdParser) parseModule() error {
 				if !p.accept(lexer.TokenRBrace) {
 					return p.errorf("expected '}' in OBJECT IDENTIFIER assignment")
 				}
-				// resolve parent
-				parent, ok := p.mod.NodesByName[parentName]
-				if !ok {
-					return p.errorf("unknown parent node %s", parentName)
+				// resolve parent (allow forward references)
+				if parent, ok := p.mod.NodesByName[parentName]; ok {
+					oid := append(append([]int(nil), parent...), index)
+					p.mod.NodesByName[ident] = oid
+				} else {
+					name := ident
+					p.pend = append(p.pend, pendingRef{
+						parent: parentName,
+						index:  index,
+						apply: func(base []int) {
+							oid := append(append([]int(nil), base...), index)
+							p.mod.NodesByName[name] = oid
+						},
+					})
 				}
-				oid := append(append([]int(nil), parent...), index)
-				p.mod.NodesByName[ident] = oid
 				continue
 			}
 			if p.isIdent("OBJECT-TYPE") {
@@ -141,6 +192,12 @@ func (p *rdParser) parseModule() error {
 						var idx []string
 						for {
 							if p.tok.Type == lexer.TokenIdent {
+								// Allow optional IMPLIED keyword prefix in SMIv2
+								if equalFold(p.tok.Text, "IMPLIED") {
+									p.next()
+									// expect actual identifier next without requiring a comma
+									continue
+								}
 								idx = append(idx, p.tok.Text)
 								p.next()
 								if p.accept(lexer.TokenComma) {
@@ -168,13 +225,21 @@ func (p *rdParser) parseModule() error {
 						if !p.accept(lexer.TokenRBrace) {
 							return p.errorf("expected '}' after OBJECT-TYPE OID ref")
 						}
-						parent, ok := p.mod.NodesByName[parentName]
-						if !ok {
-							return p.errorf("unknown parent node %s", parentName)
+						if parent, ok := p.mod.NodesByName[parentName]; ok {
+							obj.OID = append(append([]int(nil), parent...), index)
+							// store
+							p.mod.ObjectsByName[obj.Name] = obj
+						} else {
+							ref := obj
+							p.pend = append(p.pend, pendingRef{
+								parent: parentName,
+								index:  index,
+								apply: func(base []int) {
+									ref.OID = append(append([]int(nil), base...), index)
+									p.mod.ObjectsByName[ref.Name] = ref
+								},
+							})
 						}
-						obj.OID = append(append([]int(nil), parent...), index)
-						// store
-						p.mod.ObjectsByName[obj.Name] = obj
 						break
 					}
 					// If we see another top-level identifier or END, stop
@@ -189,6 +254,222 @@ func (p *rdParser) parseModule() error {
 					if p.tok.Type != lexer.TokenEOF {
 						p.next()
 					}
+				}
+				continue
+			}
+			if p.isIdent("MODULE-IDENTITY") {
+				p.next()
+				// MODULE-IDENTITY
+				mi := &ModuleIdentityIR{Name: ident}
+				// Expect 'LAST-UPDATED', 'ORGANIZATION', 'CONTACT-INFO', 'DESCRIPTION' then '::=' { parent n }
+				for {
+					if p.acceptIdent("LAST-UPDATED") {
+						if p.tok.Type == lexer.TokenString {
+							mi.LastUpdated = p.tok.Text
+							p.next()
+						}
+						continue
+					}
+					if p.acceptIdent("ORGANIZATION") {
+						if p.tok.Type == lexer.TokenString {
+							mi.Organization = p.tok.Text
+							p.next()
+						}
+						continue
+					}
+					if p.acceptIdent("CONTACT-INFO") {
+						if p.tok.Type == lexer.TokenString {
+							mi.ContactInfo = p.tok.Text
+							p.next()
+						}
+						continue
+					}
+					if p.acceptIdent("DESCRIPTION") {
+						if p.tok.Type == lexer.TokenString {
+							mi.Description = p.tok.Text
+							p.next()
+						}
+						continue
+					}
+					if p.accept(lexer.TokenColonColonEq) {
+						if !p.accept(lexer.TokenLBrace) {
+							return p.errorf("expected '{' after MODULE-IDENTITY '::='")
+						}
+						parent, idx := p.parseParentRef()
+						if !p.accept(lexer.TokenRBrace) {
+							return p.errorf("expected '}' after MODULE-IDENTITY OID")
+						}
+						if base, ok := p.mod.NodesByName[parent]; ok {
+							mi.OID = append(append([]int(nil), base...), idx)
+							p.mod.ModuleIdentity = mi
+						} else {
+							ref := mi
+							p.pend = append(p.pend, pendingRef{
+								parent: parent,
+								index:  idx,
+								apply: func(base []int) {
+									ref.OID = append(append([]int(nil), base...), idx)
+									p.mod.ModuleIdentity = ref
+								},
+							})
+						}
+						break
+					}
+					if p.tok.Type == lexer.TokenEOF {
+						return p.errorf("unexpected EOF in MODULE-IDENTITY")
+					}
+					p.next()
+				}
+				continue
+			}
+			if p.isIdent("OBJECT-IDENTITY") {
+				p.next()
+				oi := &ObjectIdentityIR{Name: ident}
+				for {
+					if p.acceptIdent("STATUS") {
+						oi.Status = p.parseUntilKeywords("DESCRIPTION", "::=")
+						continue
+					}
+					if p.acceptIdent("DESCRIPTION") {
+						if p.tok.Type == lexer.TokenString {
+							oi.Description = p.tok.Text
+							p.next()
+						}
+						continue
+					}
+					if p.accept(lexer.TokenColonColonEq) {
+						if !p.accept(lexer.TokenLBrace) {
+							return p.errorf("expected '{' after OBJECT-IDENTITY '::='")
+						}
+						parent, idx := p.parseParentRef()
+						if !p.accept(lexer.TokenRBrace) {
+							return p.errorf("expected '}' after OBJECT-IDENTITY OID")
+						}
+						if base, ok := p.mod.NodesByName[parent]; ok {
+							oi.OID = append(append([]int(nil), base...), idx)
+							p.mod.ObjectIdentities[oi.Name] = oi
+						} else {
+							ref := oi
+							p.pend = append(p.pend, pendingRef{
+								parent: parent,
+								index:  idx,
+								apply: func(base []int) {
+									ref.OID = append(append([]int(nil), base...), idx)
+									p.mod.ObjectIdentities[ref.Name] = ref
+								},
+							})
+						}
+						break
+					}
+					if p.tok.Type == lexer.TokenEOF {
+						return p.errorf("unexpected EOF in OBJECT-IDENTITY")
+					}
+					p.next()
+				}
+				continue
+			}
+			if p.isIdent("TEXTUAL-CONVENTION") {
+				p.next()
+				tc := &TextualConventionIR{Name: ident}
+				// TEXTUAL-CONVENTION
+				for {
+					if p.acceptIdent("DISPLAY-HINT") {
+						if p.tok.Type == lexer.TokenString {
+							tc.DisplayHint = p.tok.Text
+							p.next()
+						}
+						continue
+					}
+					if p.acceptIdent("STATUS") {
+						tc.Status = p.parseUntilKeywords("DESCRIPTION", "SYNTAX")
+						continue
+					}
+					if p.acceptIdent("DESCRIPTION") {
+						if p.tok.Type == lexer.TokenString {
+							tc.Description = p.tok.Text
+							p.next()
+						}
+						continue
+					}
+					if p.acceptIdent("SYNTAX") {
+						tc.Syntax = p.parseTypeString()
+						// end of textual convention
+						p.mod.TextualConventions[tc.Name] = tc
+						break
+					}
+					if p.tok.Type == lexer.TokenEOF {
+						return p.errorf("unexpected EOF in TEXTUAL-CONVENTION")
+					}
+					p.next()
+				}
+				continue
+			}
+			if p.isIdent("NOTIFICATION-TYPE") {
+				p.next()
+				nt := &NotificationTypeIR{Name: ident}
+				for {
+					if p.acceptIdent("OBJECTS") {
+						if !p.accept(lexer.TokenLBrace) {
+							return p.errorf("expected '{' after OBJECTS")
+						}
+						var objs []string
+						for {
+							if p.tok.Type == lexer.TokenIdent {
+								objs = append(objs, p.tok.Text)
+								p.next()
+							} else {
+								break
+							}
+							if p.accept(lexer.TokenComma) {
+								continue
+							}
+							break
+						}
+						if !p.accept(lexer.TokenRBrace) {
+							return p.errorf("expected '}' at end of OBJECTS list")
+						}
+						nt.Objects = objs
+						continue
+					}
+					if p.acceptIdent("STATUS") {
+						nt.Status = p.parseUntilKeywords("DESCRIPTION", "::=")
+						continue
+					}
+					if p.acceptIdent("DESCRIPTION") {
+						if p.tok.Type == lexer.TokenString {
+							nt.Description = p.tok.Text
+							p.next()
+						}
+						continue
+					}
+					if p.accept(lexer.TokenColonColonEq) {
+						if !p.accept(lexer.TokenLBrace) {
+							return p.errorf("expected '{' after NOTIFICATION-TYPE '::='")
+						}
+						parent, idx := p.parseParentRef()
+						if !p.accept(lexer.TokenRBrace) {
+							return p.errorf("expected '}' after NOTIFICATION-TYPE OID")
+						}
+						if base, ok := p.mod.NodesByName[parent]; ok {
+							nt.OID = append(append([]int(nil), base...), idx)
+							p.mod.NotificationTypes[nt.Name] = nt
+						} else {
+							ref := nt
+							p.pend = append(p.pend, pendingRef{
+								parent: parent,
+								index:  idx,
+								apply: func(base []int) {
+									ref.OID = append(append([]int(nil), base...), idx)
+									p.mod.NotificationTypes[ref.Name] = ref
+								},
+							})
+						}
+						break
+					}
+					if p.tok.Type == lexer.TokenEOF {
+						return p.errorf("unexpected EOF in NOTIFICATION-TYPE")
+					}
+					p.next()
 				}
 				continue
 			}
@@ -207,6 +488,27 @@ func (p *rdParser) parseModule() error {
 	if !p.acceptIdent("END") {
 		return p.errorf("expected END")
 	}
+	// Resolve pending references iteratively
+	for {
+		if len(p.pend) == 0 {
+			break
+		}
+		progressed := false
+		remaining := p.pend[:0]
+		for _, pr := range p.pend {
+			if base, ok := p.mod.NodesByName[pr.parent]; ok {
+				pr.apply(base)
+				progressed = true
+			} else {
+				remaining = append(remaining, pr)
+			}
+		}
+		p.pend = remaining
+		if !progressed {
+			break
+		}
+	}
+	// Keep unresolved pending refs (likely imported) without failing
 	return nil
 }
 
@@ -299,6 +601,9 @@ func (p *rdParser) initBaseOids() {
 	p.mod.NodesByName["mib-2"] = []int{1, 3, 6, 1, 2, 1}
 	p.mod.NodesByName["private"] = []int{1, 3, 6, 1, 4}
 	p.mod.NodesByName["enterprises"] = []int{1, 3, 6, 1, 4, 1}
+	// Common SMIv2 nodes used by standard MIBs
+	p.mod.NodesByName["snmpV2"] = []int{1, 3, 6, 1, 6}
+	p.mod.NodesByName["snmpModules"] = []int{1, 3, 6, 1, 6, 3}
 }
 
 func (p *rdParser) next() { p.tok = p.l.Next() }

@@ -8,9 +8,13 @@ import (
 // Module represents a parsed MIB module.
 // It contains declared OID nodes and OBJECT-TYPE definitions resolved to full OIDs.
 type Module struct {
-	Name          string
-	NodesByName   map[string]*OidNode
-	ObjectsByName map[string]*ObjectType
+	Name               string
+	NodesByName        map[string]*OidNode
+	ObjectsByName      map[string]*ObjectType
+	ModuleIdentity     *ModuleIdentity
+	ObjectIdentities   map[string]*ObjectIdentity
+	TextualConventions map[string]*TextualConvention
+	NotificationTypes  map[string]*NotificationType
 }
 
 // OidNode represents a named node in the OID tree.
@@ -49,6 +53,39 @@ func (m *Module) GetNodeOIDByName(name string) ([]int, bool) {
 		return nil, false
 	}
 	return append([]int(nil), n.OID...), true
+}
+
+// SMIv2 additions
+type ModuleIdentity struct {
+	Name         string
+	OID          []int
+	LastUpdated  string
+	Organization string
+	ContactInfo  string
+	Description  string
+}
+
+type ObjectIdentity struct {
+	Name        string
+	OID         []int
+	Status      string
+	Description string
+}
+
+type TextualConvention struct {
+	Name        string
+	DisplayHint string
+	Status      string
+	Description string
+	Syntax      string
+}
+
+type NotificationType struct {
+	Name        string
+	OID         []int
+	Objects     []string
+	Status      string
+	Description string
 }
 
 // String converts an OidNode to dotted string form.
