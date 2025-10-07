@@ -13,14 +13,10 @@ func ParseMIB(mib []byte) (*Module, error) {
 	}
 	mod := &Module{
 		Name:               ir.Name,
-		NodesByName:        map[string]*OidNode{},
 		ObjectsByName:      map[string]*ObjectType{},
 		ObjectIdentities:   map[string]*ObjectIdentity{},
 		TextualConventions: map[string]*TextualConvention{},
 		NotificationTypes:  map[string]*NotificationType{},
-	}
-	for name, oid := range ir.NodesByName {
-		mod.NodesByName[name] = &OidNode{Name: name, OID: append([]int(nil), oid...)}
 	}
 	for name, obj := range ir.ObjectsByName {
 		mod.ObjectsByName[name] = &ObjectType{

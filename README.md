@@ -1,2 +1,3 @@
 # go-mib-parser
-Minimal library for parsing ASN.1 MIB files 
+
+Minimal library for parsing MIB files.
