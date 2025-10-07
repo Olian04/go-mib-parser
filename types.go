@@ -45,6 +45,46 @@ func (m *Module) GetObjectByName(name string) (*ObjectType, bool) {
 	return v, ok
 }
 
+// GetObjectByOID returns the OBJECT-TYPE whose fully resolved OID matches
+// the provided numeric OID slice exactly.
+func (m *Module) GetObjectByOID(oid []int) (*ObjectType, bool) {
+	if m == nil || m.ObjectsByName == nil {
+		return nil, false
+	}
+	for _, obj := range m.ObjectsByName {
+		if oidsEqual(obj.OID, oid) {
+			return obj, true
+		}
+	}
+	return nil, false
+}
+
+// GetObjectByOIDString returns the OBJECT-TYPE whose OID matches the dotted
+// decimal string (e.g., "1.3.6.1.2.1").
+func (m *Module) GetObjectByOIDString(oid string) (*ObjectType, bool) {
+	if m == nil || m.ObjectsByName == nil {
+		return nil, false
+	}
+	for _, obj := range m.ObjectsByName {
+		if oidToString(obj.OID) == oid {
+			return obj, true
+		}
+	}
+	return nil, false
+}
+
+func oidsEqual(a, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
 // ObjectType represents an SMIv2 OBJECT-TYPE definition with its resolved OID.
 // It implements the Object interface.
 type ObjectType struct {
